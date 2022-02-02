@@ -1,0 +1,8 @@
+projectName: runarepo
+pythonProjectVersion: 0.1.0
+projectAuthor: Jeremy Magland
+projectAuthorEmail: jmagland@flatironinstitute.org
+projectDescription: Run a source code repo
+projectUrl: https://github.com/scratchrealm/runarepo
+projectBugTrackerUrl: https://github.com/scratchrealm/runarepo/issues
+pythonPackageDir: .
