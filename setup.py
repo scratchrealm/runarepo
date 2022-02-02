@@ -5,6 +5,8 @@ setup(
     scripts=['bin/runarepo'],
     include_package_data = True,
     install_requires=[
-        'kachery-client>=1.0.21'
+        'kachery-client>=1.0.21',
+        'docker',
+        'click'
     ]
 )
