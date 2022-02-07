@@ -98,7 +98,7 @@ def _run_local_repo(
                 --bind {repo_path}:/repo \\
                 {env_opts} \\
                 --env OUTPUT_DIR=/working/output \\
-                --env WORKING_DIR=/working
+                --env WORKING_DIR=/working \\
                 {image} \\
                 /repo/run
             ''')
