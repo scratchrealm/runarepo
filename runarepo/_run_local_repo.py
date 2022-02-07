@@ -13,7 +13,9 @@ def _run_local_repo(
     repo_path: str, *,
     inputs: List[Input]=[],
     output_dir: Union[str, None]=None,
-    use_docker: bool=False
+    use_docker: bool=False,
+    use_singularity: bool=False,
+    image: Union[str, None]=None
 ):
     if repo_path is not None and not os.path.isabs(repo_path):
         repo_path = os.path.abspath(repo_path)
@@ -22,9 +24,14 @@ def _run_local_repo(
     if os.path.exists(output_dir):
         raise Exception(f'Output directory already exists: {output_dir}')
     if use_docker:
+        if use_singularity:
+            raise Exception('Cannot use both docker and singularity simultaneously')
         client = docker.from_env()
-        image, _ = client.images.build(path=repo_path + '/env')
-        image = cast(Image, image)
+        if image is None:
+            docker_image, _ = client.images.build(path=repo_path + '/env')
+        else:
+            docker_image = client.images.pull(image)
+        docker_image = cast(Image, docker_image)
         mounts: List[Mount] = []
         env = {}
         for input in inputs:
@@ -38,7 +45,7 @@ def _run_local_repo(
         env['OUTPUT_DIR'] = '/output'
         env['WORKING_DIR'] = '/working'
         container = client.containers.create(
-            image.id,
+            docker_image.id,
             '/repo/run',
             mounts=mounts,
             environment=env
@@ -69,6 +76,37 @@ def _run_local_repo(
             except:
                 pass
             container.remove()
+    elif use_singularity:
+        if image is None:
+            raise Exception('Must supply an image when using singularity')
+        with kc.TemporaryDirectory() as tmpdir:
+            bind_opts = ' '.join([
+                f'--bind {input.path}:inputs/{input.name}'
+                for input in inputs
+            ])
+            env_opts = ' '.join([
+                f'--env {input.name}=inputs/{input.name}'
+                for input in inputs
+            ])
+            ss = kc.ShellScript(f'''
+            #!/bin/bash
+
+            # we really should have the -C option here, but it seems to be causing trouble
+            singularity exec \\
+                {bind_opts} \\
+                --bind {tmpdir}/working:/working \\
+                --bind {repo_path}:/repo \\
+                {env_opts} \\
+                --env OUTPUT_DIR=/working/output \\
+                --env WORKING_DIR=/working
+                {image} \\
+                /repo/run
+            ''')
+            print(ss._script)
+            ss.start()
+            ss.wait()
+            if output_dir is not None:
+                shutil.copytree(f'{tmpdir}/output', output_dir)
     else:
         with kc.TemporaryDirectory() as tmpdir:
             script = '#!/bin/bash\n\n'
