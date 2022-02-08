@@ -88,6 +88,7 @@ def _run_local_repo(
                 f'--env {input.name}=/inputs/{input.name}'
                 for input in inputs
             ])
+            os.mkdir(f'{tmpdir}/working')
             ss = kc.ShellScript(f'''
             #!/bin/bash
 
