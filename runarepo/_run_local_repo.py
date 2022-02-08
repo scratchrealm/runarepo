@@ -81,11 +81,11 @@ def _run_local_repo(
             raise Exception('Must supply an image when using singularity')
         with kc.TemporaryDirectory() as tmpdir:
             bind_opts = ' '.join([
-                f'--bind {input.path}:inputs/{input.name}'
+                f'--bind {input.path}:/inputs/{input.name}'
                 for input in inputs
             ])
             env_opts = ' '.join([
-                f'--env {input.name}=inputs/{input.name}'
+                f'--env {input.name}=/inputs/{input.name}'
                 for input in inputs
             ])
             ss = kc.ShellScript(f'''
