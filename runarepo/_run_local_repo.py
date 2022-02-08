@@ -107,7 +107,7 @@ def _run_local_repo(
             ss.start()
             ss.wait()
             if output_dir is not None:
-                shutil.copytree(f'{tmpdir}/output', output_dir)
+                shutil.copytree(f'{tmpdir}/working/output', output_dir)
     else:
         with kc.TemporaryDirectory() as tmpdir:
             script = '#!/bin/bash\n\n'
