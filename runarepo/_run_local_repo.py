@@ -3,11 +3,17 @@ import docker
 from typing import List, cast, Union
 import tarfile
 import shutil
+import time
 import kachery_client as kc
 from docker.models.images import Image
 from docker.models.containers import Container
 from docker.types import Mount
+
+from .consolecapture import ConsoleCapture
 from .Input import Input
+
+class RunOutput:
+    console_lines = None
 
 def _run_local_repo(
     repo_path: str, *,
@@ -23,6 +29,7 @@ def _run_local_repo(
         output_dir = os.path.abspath(output_dir)
     if os.path.exists(output_dir):
         raise Exception(f'Output directory already exists: {output_dir}')
+    output = RunOutput()
     if use_docker:
         if use_singularity:
             raise Exception('Cannot use both docker and singularity simultaneously')
@@ -52,11 +59,13 @@ def _run_local_repo(
         )
         container = cast(Container, container)
         try:
+            output.console_lines = []
             container.start()
             logs = container.logs(stream=True)
             for a in logs:
                 for b in a.split(b'\n'):
                     if b:
+                        output.console_lines.append({'text': b.decode(), 'timestamp': time.time() - 0, 'stderr': False})
                         print(b.decode())
             if output_dir is not None:
                 os.mkdir(output_dir)
@@ -89,37 +98,42 @@ def _run_local_repo(
                 for input in inputs
             ])
             os.mkdir(f'{tmpdir}/working')
-            ss = kc.ShellScript(f'''
-            #!/bin/bash
+            with ConsoleCapture() as cc:
+                ss = kc.ShellScript(f'''
+                #!/bin/bash
 
-            # we really should have the -C option here, but it seems to be causing trouble
-            singularity exec \\
-                {bind_opts} \\
-                --bind {tmpdir}/working:/working \\
-                --bind {repo_path}:/repo \\
-                {env_opts} \\
-                --env OUTPUT_DIR=/working/output \\
-                --env WORKING_DIR=/working \\
-                {image} \\
-                /repo/run
-            ''')
-            print(ss._script)
-            ss.start()
-            ss.wait()
-            if output_dir is not None:
-                shutil.copytree(f'{tmpdir}/working/output', output_dir)
+                # we really should have the -C option here, but it seems to be causing trouble
+                singularity exec \\
+                    {bind_opts} \\
+                    --bind {tmpdir}/working:/working \\
+                    --bind {repo_path}:/repo \\
+                    {env_opts} \\
+                    --env OUTPUT_DIR=/working/output \\
+                    --env WORKING_DIR=/working \\
+                    {image} \\
+                    /repo/run
+                ''')
+                print(ss._script)
+                ss.start()
+                ss.wait()
+                if output_dir is not None:
+                    shutil.copytree(f'{tmpdir}/working/output', output_dir)
+                output.console_lines = cc.lines
     else:
         with kc.TemporaryDirectory() as tmpdir:
-            script = '#!/bin/bash\n\n'
-            if output_dir is not None:
-                script += f'export OUTPUT_DIR={output_dir}\n'
-            script += f'export WORKING_DIR={tmpdir}\n'
-            for input in inputs:
-                script += f'export {input.name}="{input.path}"\n'
-            script += f'\n'
-            script += f'{repo_path}/run'
-            ss = kc.ShellScript(script)
-            ss.start()
-            ss.wait()
+            with ConsoleCapture() as cc:
+                script = '#!/bin/bash\n\n'
+                if output_dir is not None:
+                    script += f'export OUTPUT_DIR={output_dir}\n'
+                script += f'export WORKING_DIR={tmpdir}\n'
+                for input in inputs:
+                    script += f'export {input.name}="{input.path}"\n'
+                script += f'\n'
+                script += f'{repo_path}/run'
+                ss = kc.ShellScript(script)
+                ss.start()
+                ss.wait()
+                output.console_lines = cc.lines
+    return output
 
 

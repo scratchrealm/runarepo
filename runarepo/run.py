@@ -17,7 +17,7 @@ def run(
     def helper(local_path: str):
         if subpath is not None:
             local_path = local_path + '/' + subpath
-        _run_local_repo(local_path, inputs=inputs, output_dir=output_dir, use_docker=use_docker, use_singularity=use_singularity, image=image)
+        return _run_local_repo(local_path, inputs=inputs, output_dir=output_dir, use_docker=use_docker, use_singularity=use_singularity, image=image)
     if repo.startswith('http://') or repo.startswith('https://') or repo.startswith('git://'):
         with kc.TemporaryDirectory() as tmpdir:
             local_path = f'{tmpdir}/repo'
@@ -27,9 +27,9 @@ def run(
             ''')
             ss.start()
             ss.wait()
-            helper(local_path)
+            return helper(local_path)
     elif os.path.isdir(repo):
-        helper(repo)
+        return helper(repo)
     else:
         raise Exception(f'Not a directory: {repo}')
     
