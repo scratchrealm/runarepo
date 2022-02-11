@@ -126,7 +126,7 @@ def _run_local_repo(
                 ss.start()
                 retcode = ss.wait()
                 output.retcode = retcode
-                if retcode != 0:
+                if retcode == 0:
                     if output_dir is not None:
                         shutil.copytree(f'{tmpdir}/working/output', output_dir)
                 output.console_lines = cc.lines
@@ -141,8 +141,7 @@ def _run_local_repo(
                     script += f'export {input.name}="{input.path}"\n'
                 script += f'\n'
                 script += f'{repo_path}/run'
-                ss = kc.ShellScript(script, redirect_output_to_stdout=True)
-                # Note: redirect_output_to_stdout=True above is important for the console capture to work properly
+                ss = kc.ShellScript(script, redirect_output_to_stdout=False)
                 
                 ss.start()
                 retcode = ss.wait()
