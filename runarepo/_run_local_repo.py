@@ -27,7 +27,7 @@ def _run_local_repo(
         repo_path = os.path.abspath(repo_path)
     if output_dir is not None and not os.path.isabs(output_dir):
         output_dir = os.path.abspath(output_dir)
-    if os.path.exists(output_dir):
+    if output_dir is not None and os.path.exists(output_dir):
         raise Exception(f'Output directory already exists: {output_dir}')
     output = RunOutput()
     if use_docker:
@@ -35,8 +35,10 @@ def _run_local_repo(
             raise Exception('Cannot use both docker and singularity simultaneously')
         client = docker.from_env()
         if image is None:
+            print('Building docker image')
             docker_image, _ = client.images.build(path=repo_path + '/env')
         else:
+            print('Pulling docker image')
             docker_image = client.images.pull(image)
         docker_image = cast(Image, docker_image)
         mounts: List[Mount] = []
@@ -51,6 +53,7 @@ def _run_local_repo(
         mounts.append(Mount(target='/repo', source=repo_path, type='bind', read_only=True))
         env['OUTPUT_DIR'] = '/output'
         env['WORKING_DIR'] = '/working'
+        print('Creating docker container')
         container = client.containers.create(
             docker_image.id,
             '/repo/run',
@@ -60,6 +63,7 @@ def _run_local_repo(
         container = cast(Container, container)
         try:
             output.console_lines = []
+            print('Starting docker container')
             container.start()
             logs = container.logs(stream=True)
             for a in logs:

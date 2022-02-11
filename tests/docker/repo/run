@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo "Start: docker test"
+sleep 3
+echo "End: docker test"
