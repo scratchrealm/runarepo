@@ -13,7 +13,8 @@ from .consolecapture import ConsoleCapture
 from .Input import Input
 
 class RunOutput:
-    console_lines = None
+    retcode: Union[int, None] = None
+    console_lines: Union[List[dict], None] = None
 
 def _run_local_repo(
     repo_path: str, *,
@@ -71,6 +72,8 @@ def _run_local_repo(
                     if b:
                         output.console_lines.append({'text': b.decode(), 'timestamp': time.time() - 0, 'stderr': False})
                         print(b.decode())
+            # todo: handle retcode properly here
+            output.retcode = 0
             if output_dir is not None:
                 os.mkdir(output_dir)
                 with kc.TemporaryDirectory() as tmpdir:
@@ -116,12 +119,16 @@ def _run_local_repo(
                     --env WORKING_DIR=/working \\
                     {image} \\
                     /repo/run
-                ''')
+                ''', redirect_output_to_stdout=True)
+                # Note: redirect_output_to_stdout=True above is important for the console capture to work properly
+
                 print(ss._script)
                 ss.start()
-                ss.wait()
-                if output_dir is not None:
-                    shutil.copytree(f'{tmpdir}/working/output', output_dir)
+                retcode = ss.wait()
+                output.retcode = retcode
+                if retcode != 0:
+                    if output_dir is not None:
+                        shutil.copytree(f'{tmpdir}/working/output', output_dir)
                 output.console_lines = cc.lines
     else:
         with kc.TemporaryDirectory() as tmpdir:
@@ -134,9 +141,12 @@ def _run_local_repo(
                     script += f'export {input.name}="{input.path}"\n'
                 script += f'\n'
                 script += f'{repo_path}/run'
-                ss = kc.ShellScript(script)
+                ss = kc.ShellScript(script, redirect_output_to_stdout=True)
+                # Note: redirect_output_to_stdout=True above is important for the console capture to work properly
+                
                 ss.start()
-                ss.wait()
+                retcode = ss.wait()
+                output.retcode = retcode
                 output.console_lines = cc.lines
     return output
 
